@@ -29,7 +29,7 @@ def run_training_loop(args):
     # make the gym environment
     env = gym.make(args.env_name, render_mode=None)
     discrete = isinstance(env.action_space, gym.spaces.Discrete)
-
+    
     # add action noise, if needed
     if args.action_noise_std > 0:
         assert not discrete, f"Cannot use --action_noise_std for discrete environment {args.env_name}"
@@ -40,6 +40,7 @@ def run_training_loop(args):
     ob_dim = env.observation_space.shape[0]
     ac_dim = env.action_space.n if discrete else env.action_space.shape[0]
 
+    print("ob_dim: {}, ac_dim: {}".format(ob_dim,ac_dim))
     # simulation timestep, will be used for video saving
     if hasattr(env, "model"):
         fps = 1 / env.model.opt.timestep
@@ -70,15 +71,17 @@ def run_training_loop(args):
         print(f"\n********** Iteration {itr} ************")
         # TODO: sample `args.batch_size` transitions using utils.sample_trajectories
         # make sure to use `max_ep_len`
-        trajs, envsteps_this_batch = None, None  # TODO
+        trajs, envsteps_this_batch = utils.sample_trajectories(env, agent.actor, args.batch_size, max_ep_len)
+        #trajs = utils.sample_n_trajectories(env, agent.actor, args.batch_size, max_ep_len)
         total_envsteps += envsteps_this_batch
-
+        #print("rewards shape" , trajs[0]["reward"].shape)
         # trajs should be a list of dictionaries of NumPy arrays, where each dictionary corresponds to a trajectory.
         # this line converts this into a single dictionary of lists of NumPy arrays.
         trajs_dict = {k: [traj[k] for traj in trajs] for k in trajs[0]}
+        print(trajs_dict.keys())
 
         # TODO: train the agent using the sampled trajectories and the agent's update function
-        train_info: dict = None
+        train_info: dict = agent.update(trajs_dict["observation"], trajs_dict["action"], trajs_dict["reward"], trajs_dict["terminal"])  
 
         if itr % args.scalar_log_freq == 0:
             # save eval metrics
